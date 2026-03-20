@@ -92,6 +92,15 @@ def test_inspect_type_handles_type_expression() -> None:
     assert result.result["type"]["args"][0]["category"] == "model"
 
 
+def test_inspect_type_handles_object_builtin_in_type_expression() -> None:
+    result = inspect_type(target="dict[str, object]")
+
+    assert result.result["type"]["category"] == "mapping"
+    assert result.result["type"]["args"][0]["category"] == "scalar"
+    assert result.result["type"]["args"][0]["display"] == "str"
+    assert result.result["type"]["args"][1]["display"] == "<class 'object'>"
+
+
 def test_create_example_payload_emits_valid_and_invalid_examples() -> None:
     result = create_example_payload(target=TARGET, count=1, invalid_examples=True)
 

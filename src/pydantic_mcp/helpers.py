@@ -281,6 +281,7 @@ def build_eval_namespace(entries: dict[str, RegistryEntry]) -> dict[str, Any]:
         "frozenset": frozenset,
         "int": int,
         "list": list,
+        "object": object,
         "set": set,
         "str": str,
         "tuple": tuple,
