@@ -44,6 +44,7 @@ SERVER_INSTRUCTIONS = dedent(
     - Generate validation and serialization JSON Schema variants.
     - Explain fields, defaults, aliases, constraints, decorators, and nested types.
     - Produce example valid and invalid payloads to ground downstream prompts.
+    - Infer candidate Pydantic models directly from sample JSON payloads.
     - Inspect migration risks and partial JSON parsing behavior.
 
     Recommended workflow:
@@ -53,7 +54,8 @@ SERVER_INSTRUCTIONS = dedent(
     4. Use `serialize_data` and `generate_json_schema` to compare runtime and schema behavior.
     5. When debugging ambiguity, use `compare_validation_modes`.
     6. Use `create_example_payload` for test fixtures and prompt grounding.
-    7. Use `migrate_v1_to_v2` when the codebase still contains legacy APIs.
+    7. Use `generate_model_from_json` when you only have representative JSON samples.
+    8. Use `migrate_v1_to_v2` when the codebase still contains legacy APIs.
 
     Operating guidance:
     - Prefer deterministic tool calls with explicit `target` values.

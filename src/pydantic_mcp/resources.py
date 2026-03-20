@@ -183,7 +183,8 @@ def reference_overview() -> str:
         6. `generate_json_schema`
         7. `compare_validation_modes`
         8. `create_example_payload`
-        9. `migrate_v1_to_v2`
+        9. `generate_model_from_json`
+        10. `migrate_v1_to_v2`
 
         Useful resources:
         - `pydantic://server/capabilities`

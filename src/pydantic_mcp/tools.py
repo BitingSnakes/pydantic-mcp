@@ -7,6 +7,7 @@ from .helpers import (
     create_examples,
     describe_type,
     explain_model_data,
+    generate_model_from_json_report,
     make_response,
     migration_report,
     parse_partial_json_report,
@@ -286,3 +287,12 @@ def parse_partial_json(
     )
     _record_response_errors("parse_partial_json", target, response)
     return response
+
+
+@mcp.tool(tags={"generation", "json", "pydantic"})
+def generate_model_from_json(
+    json_input: object,
+    model_name: str = "GeneratedModel",
+) -> ToolResponse:
+    """Infer candidate Pydantic models from a JSON string or JSON-like payload."""
+    return generate_model_from_json_report(json_input, model_name=model_name)

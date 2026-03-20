@@ -9,6 +9,7 @@ from mcp_server import (
     compare_validation_modes,
     create_example_payload,
     explain_model,
+    generate_model_from_json,
     generate_json_schema,
     inspect_type,
     list_models,
@@ -106,6 +107,33 @@ def test_create_example_payload_emits_valid_and_invalid_examples() -> None:
 
     kinds = [item["kind"] for item in result.result["examples"]]
     assert kinds == ["valid", "invalid"]
+
+
+def test_generate_model_from_json_builds_nested_models() -> None:
+    result = generate_model_from_json(
+        model_name="OrderPayload",
+        json_input={
+            "order_id": 123,
+            "customer": {"name": "Alice", "vip": True},
+            "items": [
+                {"sku": "A-1", "quantity": 2},
+                {"sku": "B-2"},
+            ],
+            "shipping-address": {"city": "San Francisco"},
+        },
+    )
+
+    assert result.result["ok"] is True
+    assert "class OrderPayloadCustomer(BaseModel):" in result.result["code"]
+    assert "class OrderPayloadItemsItem(BaseModel):" in result.result["code"]
+    assert (
+        "shipping_address: OrderPayloadShippingAddress = Field(alias='shipping-address')"
+        in result.result["code"]
+    )
+    assert "quantity: int | None = None" in result.result["code"]
+    namespace: dict[str, object] = {}
+    exec(result.result["code"], namespace)
+    assert "OrderPayload" in namespace
 
 
 def test_compare_validation_modes_reports_matrix() -> None:

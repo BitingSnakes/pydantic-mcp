@@ -22,6 +22,7 @@ EXPECTED_TOOL_NAMES = {
     "serialize_data",
     "generate_json_schema",
     "create_example_payload",
+    "generate_model_from_json",
     "compare_validation_modes",
     "migrate_v1_to_v2",
     "parse_partial_json",

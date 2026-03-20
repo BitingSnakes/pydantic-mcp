@@ -7,6 +7,7 @@ from fnmatch import fnmatch
 import importlib
 import inspect
 import json
+import keyword
 import os
 import pkgutil
 import re
@@ -54,6 +55,21 @@ class RegistryEntry:
     docstring: str | None
     module_file: str | None
     modified_time: float | None
+
+
+@dataclass(slots=True)
+class GeneratedFieldSpec:
+    name: str
+    annotation: str
+    required: bool
+    alias: str | None = None
+
+
+@dataclass(slots=True)
+class GeneratedModelSpec:
+    name: str
+    fields: list[GeneratedFieldSpec]
+    root_annotation: str | None = None
 
 
 class RegistryCache:
@@ -991,6 +1007,335 @@ def compare_validation_modes(
             },
         },
     )
+
+
+def generate_model_from_json_report(
+    json_input: Any,
+    *,
+    model_name: str,
+) -> ToolResponse:
+    try:
+        payload = json.loads(json_input) if isinstance(json_input, str) else json_input
+    except json.JSONDecodeError as exc:
+        return make_response(
+            diagnostics=[
+                Diagnostic(
+                    level="error",
+                    message="Input is not valid JSON.",
+                    code="invalid_json",
+                    context={"error": str(exc)},
+                )
+            ],
+            result={"ok": False, "code": None, "models": [], "input_kind": "invalid"},
+        )
+
+    effective_model_name = _sanitize_model_name(model_name)
+    models: dict[str, GeneratedModelSpec] = {}
+    root_model = _infer_root_model(payload, effective_model_name, models=models)
+    models[root_model.name] = root_model
+    ordered_models = list(models.values())
+    code = _render_generated_models(ordered_models)
+
+    return make_response(
+        diagnostics=[
+            Diagnostic(
+                level="info",
+                message=f"Generated {len(ordered_models)} Pydantic model(s) from sample JSON.",
+                code="model_generated",
+                context={
+                    "root_model": root_model.name,
+                    "input_kind": _json_input_kind(payload),
+                },
+            )
+        ],
+        artifacts={
+            "root_model_name": root_model.name,
+            "input_kind": _json_input_kind(payload),
+        },
+        result={
+            "ok": True,
+            "code": code,
+            "models": [_generated_model_to_dict(model) for model in ordered_models],
+            "input_kind": _json_input_kind(payload),
+        },
+    )
+
+
+def _infer_root_model(
+    payload: Any,
+    model_name: str,
+    *,
+    models: dict[str, GeneratedModelSpec],
+) -> GeneratedModelSpec:
+    if isinstance(payload, dict):
+        return _infer_object_model([payload], model_name, models=models)
+
+    root_annotation = _infer_annotation_from_samples(
+        [payload],
+        parent_model_name=model_name,
+        field_name="root",
+        models=models,
+    )
+    return GeneratedModelSpec(
+        name=model_name, fields=[], root_annotation=root_annotation
+    )
+
+
+def _infer_object_model(
+    samples: list[dict[str, Any]],
+    model_name: str,
+    *,
+    models: dict[str, GeneratedModelSpec],
+) -> GeneratedModelSpec:
+    fields: list[GeneratedFieldSpec] = []
+    all_keys = sorted({key for sample in samples for key in sample})
+    for raw_key in all_keys:
+        present_values = [sample[raw_key] for sample in samples if raw_key in sample]
+        is_required = len(present_values) == len(samples)
+        annotation = _infer_annotation_from_samples(
+            present_values,
+            parent_model_name=model_name,
+            field_name=raw_key,
+            models=models,
+        )
+        if not is_required:
+            annotation = _union_annotations([annotation, "None"])
+        field_name = _sanitize_field_name(raw_key)
+        fields.append(
+            GeneratedFieldSpec(
+                name=field_name,
+                annotation=annotation,
+                required=is_required,
+                alias=None if field_name == raw_key else raw_key,
+            )
+        )
+    model = GeneratedModelSpec(name=model_name, fields=fields)
+    models[model_name] = model
+    return model
+
+
+def _infer_annotation_from_samples(
+    samples: list[Any],
+    *,
+    parent_model_name: str,
+    field_name: str,
+    models: dict[str, GeneratedModelSpec],
+) -> str:
+    if not samples:
+        return "Any"
+
+    annotations: list[str] = []
+    non_null_samples = [sample for sample in samples if sample is not None]
+    saw_none = len(non_null_samples) != len(samples)
+
+    if non_null_samples and all(
+        isinstance(sample, dict) for sample in non_null_samples
+    ):
+        nested_name = _nested_model_name(parent_model_name, field_name)
+        _infer_object_model(non_null_samples, nested_name, models=models)
+        annotations.append(nested_name)
+    elif non_null_samples and all(
+        isinstance(sample, list) for sample in non_null_samples
+    ):
+        annotations.append(
+            _infer_list_annotation(
+                non_null_samples,
+                parent_model_name=parent_model_name,
+                field_name=field_name,
+                models=models,
+            )
+        )
+    else:
+        annotations.extend(
+            _infer_annotation_from_value(
+                sample,
+                parent_model_name=parent_model_name,
+                field_name=field_name,
+                models=models,
+            )
+            for sample in non_null_samples
+        )
+
+    if saw_none:
+        annotations.append("None")
+    return _union_annotations(annotations)
+
+
+def _infer_list_annotation(
+    list_samples: list[list[Any]],
+    *,
+    parent_model_name: str,
+    field_name: str,
+    models: dict[str, GeneratedModelSpec],
+) -> str:
+    items = [item for sample in list_samples for item in sample]
+    if not items:
+        return "list[Any]"
+
+    if all(isinstance(item, dict) for item in items if item is not None):
+        nested_name = _nested_model_name(parent_model_name, f"{field_name}_item")
+        dict_items = [item for item in items if isinstance(item, dict)]
+        _infer_object_model(dict_items, nested_name, models=models)
+        item_annotation = nested_name
+        if any(item is None for item in items):
+            item_annotation = _union_annotations([item_annotation, "None"])
+        return f"list[{item_annotation}]"
+
+    item_annotation = _infer_annotation_from_samples(
+        items,
+        parent_model_name=parent_model_name,
+        field_name=f"{field_name}_item",
+        models=models,
+    )
+    return f"list[{item_annotation}]"
+
+
+def _infer_annotation_from_value(
+    value: Any,
+    *,
+    parent_model_name: str,
+    field_name: str,
+    models: dict[str, GeneratedModelSpec],
+) -> str:
+    del parent_model_name
+    del field_name
+    del models
+    if value is None:
+        return "None"
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, str):
+        return "str"
+    if isinstance(value, dict):
+        return "dict[str, Any]"
+    if isinstance(value, list):
+        return "list[Any]"
+    return "Any"
+
+
+def _union_annotations(annotations: list[str]) -> str:
+    unique: list[str] = []
+    for annotation in annotations:
+        if not annotation:
+            continue
+        for part in annotation.split(" | "):
+            if part not in unique:
+                unique.append(part)
+    if "float" in unique and "int" in unique:
+        unique = [part for part in unique if part != "int"]
+    if len(unique) == 1:
+        return unique[0]
+    non_none = [part for part in unique if part != "None"]
+    if "None" in unique:
+        return " | ".join(non_none + ["None"])
+    return " | ".join(unique)
+
+
+def _sanitize_model_name(raw_name: str) -> str:
+    parts = re.findall(r"[A-Za-z0-9]+", raw_name)
+    candidate = (
+        "".join(part[:1].upper() + part[1:] for part in parts) or "GeneratedModel"
+    )
+    if candidate[0].isdigit():
+        candidate = f"Model{candidate}"
+    return candidate
+
+
+def _sanitize_field_name(raw_name: str) -> str:
+    candidate = re.sub(r"\W+", "_", raw_name).strip("_").lower()
+    if not candidate:
+        candidate = "field"
+    if candidate[0].isdigit():
+        candidate = f"field_{candidate}"
+    if keyword.iskeyword(candidate):
+        candidate = f"{candidate}_"
+    return candidate
+
+
+def _nested_model_name(parent_model_name: str, field_name: str) -> str:
+    suffix = _sanitize_model_name(field_name)
+    return f"{parent_model_name}{suffix}"
+
+
+def _json_input_kind(payload: Any) -> str:
+    if isinstance(payload, dict):
+        return "object"
+    if isinstance(payload, list):
+        return "array"
+    if payload is None:
+        return "null"
+    if isinstance(payload, bool):
+        return "boolean"
+    if isinstance(payload, (int, float)):
+        return "number"
+    if isinstance(payload, str):
+        return "string"
+    return "unknown"
+
+
+def _generated_model_to_dict(model: GeneratedModelSpec) -> dict[str, Any]:
+    return {
+        "name": model.name,
+        "root_annotation": model.root_annotation,
+        "fields": [
+            {
+                "name": field.name,
+                "annotation": field.annotation,
+                "required": field.required,
+                "alias": field.alias,
+            }
+            for field in model.fields
+        ],
+    }
+
+
+def _render_generated_models(models: list[GeneratedModelSpec]) -> str:
+    typing_imports: set[str] = set()
+    pydantic_imports: set[str] = set()
+    if any("Any" in (model.root_annotation or "") for model in models) or any(
+        "Any" in field.annotation for model in models for field in model.fields
+    ):
+        typing_imports.add("Any")
+    if any(model.root_annotation is None for model in models):
+        pydantic_imports.add("BaseModel")
+    if any(model.root_annotation is not None for model in models):
+        pydantic_imports.add("RootModel")
+    if any(field.alias for model in models for field in model.fields):
+        pydantic_imports.update({"ConfigDict", "Field"})
+
+    lines: list[str] = []
+    if typing_imports:
+        lines.append(f"from typing import {', '.join(sorted(typing_imports))}")
+    if pydantic_imports:
+        lines.append(f"from pydantic import {', '.join(sorted(pydantic_imports))}")
+    lines.append("")
+    for index, model in enumerate(models):
+        if model.root_annotation is not None:
+            lines.append(f"class {model.name}(RootModel[{model.root_annotation}]):")
+            lines.append("    pass")
+        else:
+            lines.append(f"class {model.name}(BaseModel):")
+            if any(field.alias for field in model.fields):
+                lines.append("    model_config = ConfigDict(populate_by_name=True)")
+                lines.append("")
+            if not model.fields:
+                lines.append("    pass")
+            for field in model.fields:
+                line = f"    {field.name}: {field.annotation}"
+                if field.alias and field.required:
+                    line += f" = Field(alias={field.alias!r})"
+                elif field.alias and not field.required:
+                    line += f" = Field(default=None, alias={field.alias!r})"
+                elif not field.required:
+                    line += " = None"
+                lines.append(line)
+        if index != len(models) - 1:
+            lines.append("")
+    return "\n".join(lines)
 
 
 def migration_report(code: str, *, apply_fixes: bool) -> ToolResponse:

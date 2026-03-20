@@ -11,6 +11,7 @@
 - Generate validation and serialization JSON Schema.
 - Explain fields, defaults, aliases, decorators, constraints, and nested models.
 - Generate valid and invalid example payloads.
+- Infer candidate Pydantic models from sample JSON payloads.
 - Compare strict/non-strict and Python-vs-JSON validation behavior.
 - Analyze common Pydantic v1 to v2 migration issues.
 - Parse partial JSON with `pydantic_core.from_json`.
@@ -25,6 +26,7 @@
 - `serialize_data`
 - `generate_json_schema`
 - `create_example_payload`
+- `generate_model_from_json`
 - `compare_validation_modes`
 - `migrate_v1_to_v2`
 - `parse_partial_json`

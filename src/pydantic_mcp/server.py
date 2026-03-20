@@ -19,6 +19,7 @@ create_example_payload = _tools.create_example_payload
 compare_validation_modes = _tools.compare_validation_modes
 migrate_v1_to_v2 = _tools.migrate_v1_to_v2
 parse_partial_json = _tools.parse_partial_json
+generate_model_from_json = _tools.generate_model_from_json
 server_capabilities = _resources.server_capabilities
 models_index = _resources.models_index
 model_metadata = _resources.model_metadata
@@ -41,6 +42,7 @@ __all__ = [
     "create_example_payload",
     "explain_model",
     "generate_json_schema",
+    "generate_model_from_json",
     "inspect_type",
     "list_models",
     "main",
