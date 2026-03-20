@@ -1,0 +1,10 @@
+.git
+.gitignore
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+*.pyc
+tests
+dist
+pydantic_mcp.egg-info

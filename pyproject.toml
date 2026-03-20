@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pydantic-mcp"
+version = "0.1.0"
+description = "An MCP server for Pydantic model discovery, validation, and schema inspection"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastmcp>=3.1.1",
+    "pydantic>=2.12.5",
+]
+
+[project.scripts]
+pydantic-mcp = "pydantic_mcp.server:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "ruff>=0.15.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,19 @@
+services:
+  pydantic-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    environment:
+      PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS: "tests.fixtures.sample_app"
+      PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES: "tests.fixtures.sample_app"
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 30s
