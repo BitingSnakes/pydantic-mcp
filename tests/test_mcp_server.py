@@ -20,16 +20,16 @@ from mcp_server import (
 )
 
 
-TARGET = "tests.fixtures.sample_app.models.UserCreate"
+TARGET = "pydantic_mcp_sample_app.models.UserCreate"
 
 
 def test_list_models_discovers_fixture_package() -> None:
-    result = list_models(packages=["tests.fixtures.sample_app"])
+    result = list_models(packages=["pydantic_mcp_sample_app"])
 
     qualified_names = [item["qualified_name"] for item in result.result["models"]]
 
-    assert "tests.fixtures.sample_app.models.UserCreate" in qualified_names
-    assert "tests.fixtures.sample_app.models.Address" in qualified_names
+    assert "pydantic_mcp_sample_app.models.UserCreate" in qualified_names
+    assert "pydantic_mcp_sample_app.models.Address" in qualified_names
 
 
 def test_validate_data_returns_normalized_payload_and_warnings() -> None:
@@ -86,7 +86,7 @@ def test_explain_model_includes_examples_and_decorators() -> None:
 
 def test_inspect_type_handles_type_expression() -> None:
     result = inspect_type(
-        target="list[tests.fixtures.sample_app.models.UserCreate]",
+        target="list[pydantic_mcp_sample_app.models.UserCreate]",
     )
 
     assert result.result["type"]["category"] == "collection"

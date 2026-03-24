@@ -62,8 +62,8 @@ async def _collect_stdio_surface() -> tuple[
     set[str], list[object], list[object], list[object]
 ]:
     env = os.environ.copy()
-    env["PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS"] = "tests.fixtures.sample_app"
-    env["PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES"] = "tests.fixtures.sample_app"
+    env["PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS"] = "pydantic_mcp_sample_app"
+    env["PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES"] = "pydantic_mcp_sample_app"
     transport = PythonStdioTransport(
         script_path=str(ROOT / "mcp_server.py"),
         env=env,
@@ -93,8 +93,8 @@ def test_stdio_server_exposes_expected_tools_resources_and_prompts() -> None:
 
 def test_http_server_exposes_health_route() -> None:
     env = os.environ.copy()
-    env["PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS"] = "tests.fixtures.sample_app"
-    env["PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES"] = "tests.fixtures.sample_app"
+    env["PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS"] = "pydantic_mcp_sample_app"
+    env["PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES"] = "pydantic_mcp_sample_app"
     with _run_server("--transport", "http", "--port", "8123", env=env):
         payload = _wait_for_health("http://127.0.0.1:8123/healthz")
 

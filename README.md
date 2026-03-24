@@ -99,7 +99,7 @@ PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES=your_app.models \
 uv run python mcp_server.py --transport stdio
 ```
 
-These values must point at importable application packages in the runtime environment. The test fixture package `tests.fixtures.sample_app` is only available in the repository test suite and should not be used in production deployments.
+These values must point at importable application packages in the runtime environment. For local smoke tests, the repository ships an installable sample package at `pydantic_mcp_sample_app`, but production deployments should point at your own application modules.
 
 ## Testing
 
