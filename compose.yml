@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     init: true
     environment:
-      PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS: "tests.fixtures.sample_app"
-      PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES: "tests.fixtures.sample_app"
+      PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS: "${PYDANTIC_MCP_ALLOWED_IMPORT_ROOTS:-}"
+      PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES: "${PYDANTIC_MCP_DEFAULT_SCAN_PACKAGES:-}"
     ports:
       - "8001:8000"
     healthcheck:
